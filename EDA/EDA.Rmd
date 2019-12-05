@@ -20,12 +20,47 @@ library(dummies)
 library(corrplot)
 library(kableExtra)
 library(broom)
+library(lubridate)
+library(feather)
 ```
 
 ```{r}
 ftls <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/fundamentals.csv", 
                  sep = "\t",
                  header = TRUE)
-ftls
+unique((ftls %>% 
+  mutate(day = substr(public_date,1,2),
+         month = substr(public_date,3,5),
+         year = substr(public_date,6,9)))$month)
+
+flts_filtered <- ftls %>% 
+  mutate(day = substr(public_date,1,2),
+         month = substr(public_date,3,5),
+         year = substr(public_date,6,9)) %>% 
+  filter(year >= 2016) %>% 
+  mutate(month = case_when(month == "jan" ~ "1",
+                           month == "feb" ~ "2",
+                           month == "mar" ~ "3",
+                           month == "apr" ~ "4",
+                           month == "may" ~ "5",
+                           month == "jun" ~ "6",
+                           month == "jul" ~ "7",
+                           month == "aug" ~ "8",
+                           month == "sep" ~ "9",
+                           month == "oct" ~ "10",
+                           month == "nov" ~ "11",
+                           month == "dec" ~ "12",
+                           TRUE ~ "0")) %>% 
+  select(-public_date) %>% 
+  mutate(date = with(ftls, dmy(sprintf('%02s%02s%04s', day, month, year))))
+# write_feather(flts_filtered,"~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/filt_fund_2016.feather")
+```
+
+```{r}
+flts_filtered %>% 
+  ggplot() +
+  aes(y = log(bm), fill = as.factor(year)) +
+  geom_boxplot() + 
+  theme_bw()
 ```
 
