@@ -25,15 +25,10 @@ library(feather)
 ```
 
 ```{r}
+# fundamentals data
 ftls <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/fundamentals.csv", 
                  sep = "\t",
-                 header = TRUE)
-unique((ftls %>% 
-  mutate(day = substr(public_date,1,2),
-         month = substr(public_date,3,5),
-         year = substr(public_date,6,9)))$month)
-
-flts_filtered <- ftls %>% 
+                 header = TRUE) %>% 
   mutate(day = substr(public_date,1,2),
          month = substr(public_date,3,5),
          year = substr(public_date,6,9)) %>% 
@@ -53,14 +48,54 @@ flts_filtered <- ftls %>%
                            TRUE ~ "0")) %>% 
   select(-public_date) %>% 
   mutate(date = with(ftls, dmy(sprintf('%02s%02s%04s', day, month, year))))
-# write_feather(flts_filtered,"~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/filt_fund_2016.feather")
+
+
+# ff data
+
+ff <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/FF.csv", 
+                 sep = "\t",
+                 header = TRUE) %>% 
+  filter(year >= 2016) %>%
+  mutate(day = substr(date,1,2)) %>% 
+  mutate(date = with(ff, dmy(sprintf('%02s%02s%04s', day, month, year)))) 
+
+
+# crsp top 100 data
+
+crsp <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/crsp_top1000.csv", 
+                 sep = "\t",
+                 header = TRUE) %>% 
+  mutate(day = substr(date,1,2),
+         month = substr(date,3,5),
+         year = substr(date,6,9)) %>% 
+  filter(year >= 2016) %>% 
+  mutate(month = case_when(month == "jan" ~ "1",
+                           month == "feb" ~ "2",
+                           month == "mar" ~ "3",
+                           month == "apr" ~ "4",
+                           month == "may" ~ "5",
+                           month == "jun" ~ "6",
+                           month == "jul" ~ "7",
+                           month == "aug" ~ "8",
+                           month == "sep" ~ "9",
+                           month == "oct" ~ "10",
+                           month == "nov" ~ "11",
+                           month == "dec" ~ "12",
+                           TRUE ~ "0")) %>% 
+  select(-date) %>% 
+  mutate(date = with(ftls, dmy(sprintf('%02s%02s%04s', day, month, year))))
+
+
+test <- ftls %>% 
+  left_join(crsp %>%
+              select(-c(day,month,year)),
+            by = c("lpermno","date")) %>% 
+  left_join(ff %>% 
+              select(-c(day,month,year)),
+            by = "date")
+
+summary(is.na(test))
+write_feather(flts_filtered,"~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/concat_data_2016.feather")
 ```
 
-```{r}
-flts_filtered %>% 
-  ggplot() +
-  aes(y = log(bm), fill = as.factor(year)) +
-  geom_boxplot() + 
-  theme_bw()
-```
 
