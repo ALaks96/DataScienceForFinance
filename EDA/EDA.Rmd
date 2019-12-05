@@ -6,7 +6,9 @@ output:
   html_document:
     toc : true
 ---
+
 ```{r setup, include=FALSE}
+# Markdown formatting
 knitr::opts_chunk$set(
 	echo = FALSE,
 	message = FALSE,
@@ -15,6 +17,7 @@ knitr::opts_chunk$set(
 ```
 
 ```{r}
+#Lodaing libraries
 library(tidyverse)
 library(dummies)
 library(corrplot)
@@ -23,6 +26,26 @@ library(broom)
 library(lubridate)
 library(feather)
 ```
+
+# Data formatting
+
+We have three datasets which we can concatenate by date or by date and identifier. The data sets are the following:
+
+- fundamentals.csv : 
+- crsp_top1000.csv : information on stock returns and other stock characteristics for each identifier at a given date.
+- FF.csv : information on characteristics of the global market for each month of years 1990 to 2019. 
+
+From these data we obtain a significant amount of variables and rows. We need to find focus point to avoid a chaotic analysis. A first lead would be to check for performance of certain portfolios across time for recent years. An indicator we can calculate and is missing from the data is the alpha or Jensen index which can be derived from the portfolio return formula:
+
+r = Rf + beta * (Rm – Rf) + Alpha
+<=> Alpha = r – Rf  – beta * (Rm – Rf)
+
+where:
+
+r = the security’s or portfolio’s return
+Rf  = the risk-free rate of return
+beta = systemic risk of a portfolio (the security’s or portfolio’s price volatility relative to the overall market)
+Rm  = the market return
 
 ```{r}
 # fundamentals data
@@ -57,7 +80,8 @@ ff <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinan
                  header = TRUE) %>% 
   filter(year >= 2016) %>%
   mutate(day = substr(date,1,2)) %>% 
-  mutate(date = with(ff, dmy(sprintf('%02s%02s%04s', day, month, year)))) 
+  mutate(date = with(ff, dmy(sprintf('%02s%02s%04s', day, month, year)))) %>% 
+  arrange(date)
 
 
 # crsp top 100 data
@@ -83,10 +107,13 @@ crsp <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFin
                            month == "dec" ~ "12",
                            TRUE ~ "0")) %>% 
   select(-date) %>% 
-  mutate(date = with(ftls, dmy(sprintf('%02s%02s%04s', day, month, year))))
+  mutate(date = with(crsp, dmy(sprintf('%02s%02s%04s', day, month, year)))) 
+```
 
+We'll merge all the data in order to have all the information we potentially need going further in our analysis.
 
-test <- ftls %>% 
+```{r}
+merged_data <- ftls %>% 
   left_join(crsp %>%
               select(-c(day,month,year)),
             by = c("lpermno","date")) %>% 
@@ -94,8 +121,35 @@ test <- ftls %>%
               select(-c(day,month,year)),
             by = "date")
 
-summary(is.na(test))
-write_feather(flts_filtered,"~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/concat_data_2016.feather")
+# write_feather(merged_data,
+#               "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/concat_data_2016.feather")
 ```
 
+# Exploratory data analysis
+
+Before defining any model, we need to explore the data to understand the distribution of our data and check for patterns. These patterns will be the leads to any advance machine learning model we could potentially implement. 
+
+## Performance/risk analysis
+
+A first step in our analysis is identifying which portfolios have been better performing than others, taking into account the risk they took compared to the market state and their consistency across time. Let's start by ranking the portfolios according to their average alpha over the past 4 years:
+
+```{r}
+ranking <- merged_data %>% 
+  drop_na(c(ret,rf,b_mkt,mktrf)) %>% 
+  mutate(alpha = ret - rf - b_mkt * (mktrf - rf)) %>% 
+  group_by(lpermno) %>% 
+  summarize(overperf = mean(alpha),
+            risk = mean(b_mkt),
+            overallret = mean(ret)) %>% 
+  ungroup() %>% 
+  arrange(desc(overperf)) %>% 
+  top_n(10)
+ranking
+```
+
+Let's have an overview of their performance across time to better understand their positionning:
+
+```{r}
+
+```
 
