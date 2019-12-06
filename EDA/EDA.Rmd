@@ -213,7 +213,7 @@ A first step in our analysis is identifying which portfolios have been better pe
 We'll take the top portfolios for each and create groups for each to benchmark the same metrics but on non-aggregated time series data.
 
 ```{r}
-ranking <- in_sample %>% 
+ranking <- out_sample %>% 
   group_by(lpermno) %>% 
   summarize(overperf = mean(alpha),
             vol_alpha = sd(alpha),
@@ -272,20 +272,26 @@ step1 <- ten_ret %>%
   rbind(ten_alp) %>% 
   rbind(ten_pal) %>% 
   rbind(ten_vol) %>% 
-  rbind(ten_rsk) %>% 
-  mutate(i1 = row_number()) 
+  rbind(ten_rsk) %>%
+  mutate(i1 = row_number())
 
 # remove duplicated in a seperate data frame
-step2 <- step1 %>% 
-  select(-group) %>% 
+step2 <- step1 %>%
+  select(-group) %>%
   distinct()
 
 # filter the duplicated in the original data frame without dropping group variable
-top_tier <- step1 %>% 
-  filter(i1 %in% as.character(step2$i1)) %>% 
+top_tier <- step1 %>%
+  filter(i1 %in% as.character(step2$i1)) %>%
   select(-i1)
 
-unique(step1$group)
+#unique(step1$group)
+
+#test <- unique(c(ranking_alpha,ranking_palpha,ranking_returns,ranking_risk,ranking_vol))
+step1 %>% 
+  select(lpermno) %>% 
+  group_by(lpermno) %>% 
+  count()
 ```
 
 
@@ -297,27 +303,27 @@ pl_a <- top_tier %>%
   mutate(lpermno = as.factor(lpermno),
          group = as.factor(group)) %>% 
   ggplot() +
-  aes(x = date, y = alpha, color = group) +
+  aes(x = date, y = alpha, color = lpermno) +
   geom_point() +
-  geom_line(aes(group=group)) +
+  geom_line(aes(group=lpermno)) +
   theme_bw() +
   ggtitle('Evolution of alpha over time') +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 pl_b <- top_tier %>% 
   mutate(lpermno = as.factor(lpermno),
          group = as.factor(group)) %>% 
   ggplot() +
-  aes(x = date, y = b_mkt, color = group) +
+  aes(x = date, y = b_mkt, color = lpermno) +
   geom_point() +
-  geom_line(aes(group=group)) +
+  geom_line() +
   theme_bw() +
   ggtitle('Evolution of beta over time') +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 pl_r <- top_tier %>% 
   mutate(lpermno = as.factor(lpermno),
          group = as.factor(group)) %>% 
   ggplot() +
-  aes(x = date, y = ret, color = group) +
+  aes(x = date, y = ret, color = lpermno) +
   geom_point() +
   geom_line(aes(group=lpermno)) +
   theme_bw() +
