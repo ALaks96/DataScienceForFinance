@@ -210,7 +210,8 @@ A first step in our analysis is identifying which portfolios have been better pe
 - overallret: Consider the average return of the portfolio over the whole period.
 - risk: We take the average risk of the portfolio considering the whole period.
 
-We'll take the top portfolios for each to 
+We'll take the top portfolios for each and create groups for each to benchmark the same metrics but on non-aggregated time series data.
+
 ```{r}
 ranking <- in_sample %>% 
   group_by(lpermno) %>% 
@@ -223,56 +224,100 @@ ranking <- in_sample %>%
 
 ranking
 
-ranking_returns <- ranking %>% 
+ranking_returns <- as.character(unique(ranking %>% 
   arrange(desc(overallret)) %>% 
-  top_n(10)
+  top_n(10))$lpermno)
 
-ranking_alpha <- ranking %>% 
+ranking_alpha <- as.character(unique(ranking %>% 
   arrange(desc(overperf)) %>% 
-  top_n(10)
+  top_n(10))$lpermno)
 
-ranking_palpha <- ranking %>% 
+ranking_palpha <- as.character(unique(ranking %>% 
   arrange(desc(pondered_alpha)) %>% 
-  top_n(10)
+  top_n(10))$lpermno)
 
-ranking_vol <- ranking %>% 
+ranking_vol <- as.character(unique(ranking %>% 
   arrange(desc(vol_alpha)) %>% 
-  top_n(10)
+  top_n(10))$lpermno)
 
-ranking_risk <- ranking %>% 
+ranking_risk <- as.character(unique(ranking %>% 
   arrange(desc(risk)) %>% 
-  top_n(10)
+  top_n(10))$lpermno)
 ```
+
+Now that we have the portfolios for each ranking metric, we'll create groups to better identify them.
+
+```{r}
+ten_ret <- merged_data %>% 
+  filter(lpermno %in% ranking_returns) %>% 
+  mutate(group = "top ten returns")
+
+ten_alp <- merged_data %>% 
+  filter(lpermno %in% ranking_alpha) %>% 
+  mutate(group = "top ten alpha")
+
+ten_pal <- merged_data %>% 
+  filter(lpermno %in% ranking_palpha) %>% 
+  mutate(group = "top ten pondered alpha")
+
+ten_vol <- merged_data %>% 
+  filter(lpermno %in% ranking_vol) %>% 
+  mutate(group = "top ten inconsistent")
+
+ten_rsk <- merged_data %>% 
+  filter(lpermno %in% ranking_risk) %>% 
+  mutate(group = "top ten risk")
+
+step1 <- ten_ret %>% 
+  rbind(ten_alp) %>% 
+  rbind(ten_pal) %>% 
+  rbind(ten_vol) %>% 
+  rbind(ten_rsk) %>% 
+  mutate(i1 = row_number()) 
+
+# remove duplicated in a seperate data frame
+step2 <- step1 %>% 
+  select(-group) %>% 
+  distinct()
+
+# filter the duplicated in the original data frame without dropping group variable
+top_tier <- step1 %>% 
+  filter(i1 %in% as.character(step2$i1)) %>% 
+  select(-i1)
+
+unique(step1$group)
+```
+
 
 Let's have an overview of their performance across time to better understand their positionning:
 
 ```{r}
 par(mfrow=c(2,2))
-pl_a <- merged_data %>% 
-  filter(lpermno %in% c(ranking$lpermno)) %>% 
-  mutate(lpermno = as.factor(lpermno)) %>% 
+pl_a <- top_tier %>% 
+  mutate(lpermno = as.factor(lpermno),
+         group = as.factor(group)) %>% 
   ggplot() +
-  aes(x = date, y = alpha, color = lpermno) +
+  aes(x = date, y = alpha, color = group) +
   geom_point() +
-  geom_line(aes(group=lpermno)) +
+  geom_line(aes(group=group)) +
   theme_bw() +
   ggtitle('Evolution of alpha over time') +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-pl_b <- merged_data %>% 
-  filter(lpermno %in% c(ranking$lpermno)) %>% 
-  mutate(lpermno = as.factor(lpermno)) %>% 
+pl_b <- top_tier %>% 
+  mutate(lpermno = as.factor(lpermno),
+         group = as.factor(group)) %>% 
   ggplot() +
-  aes(x = date, y = b_mkt, color = lpermno) +
+  aes(x = date, y = b_mkt, color = group) +
   geom_point() +
-  geom_line(aes(group=lpermno)) +
+  geom_line(aes(group=group)) +
   theme_bw() +
   ggtitle('Evolution of beta over time') +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-pl_r <- merged_data %>% 
-  filter(lpermno %in% c(ranking$lpermno)) %>% 
-  mutate(lpermno = as.factor(lpermno)) %>% 
+pl_r <- top_tier %>% 
+  mutate(lpermno = as.factor(lpermno),
+         group = as.factor(group)) %>% 
   ggplot() +
-  aes(x = date, y = ret, color = lpermno) +
+  aes(x = date, y = ret, color = group) +
   geom_point() +
   geom_line(aes(group=lpermno)) +
   theme_bw() +
