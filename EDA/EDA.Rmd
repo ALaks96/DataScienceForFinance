@@ -55,7 +55,6 @@ ftls <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFin
   mutate(day = substr(public_date,1,2),
          month = substr(public_date,3,5),
          year = substr(public_date,6,9)) %>% 
-  filter(year >= 2016) %>% 
   mutate(month = case_when(month == "jan" ~ "1",
                            month == "feb" ~ "2",
                            month == "mar" ~ "3",
@@ -77,7 +76,6 @@ ftls <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFin
 ff <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/FF.csv", 
                  sep = "\t",
                  header = TRUE) %>% 
-  filter(year >= 2016) %>% 
   mutate(month = as.character(month),
          year = as.character(year))
 
@@ -89,7 +87,6 @@ crsp <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFin
                  header = TRUE) %>% 
   mutate(month = substr(date,3,5),
          year = substr(date,6,9)) %>% 
-  filter(year >= 2016) %>% 
   mutate(month = case_when(month == "jan" ~ "1",
                            month == "feb" ~ "2",
                            month == "mar" ~ "3",
@@ -103,19 +100,54 @@ crsp <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFin
                            month == "nov" ~ "11",
                            month == "dec" ~ "12",
                            TRUE ~ "0"))
-
-valid_portfolios <- unique((crsp %>% 
-  group_by(lpermno) %>% 
-  count() %>% 
-  filter(n == 36))$lpermno)
-
-crsp <- crsp %>% 
-  filter(lpermno %in% valid_portfolios)
 ```
 
-We'll merge all the data in order to have all the information we potentially need going further in our analysis.
+We'll keep data only on portfolios for which we have data on the whole period we consider. To do this, we check which portfolios have the max number of dates in both fundamentals and crsp, we then retrieve the portfolio identifiers and keep only those in common. m
 
 ```{r}
+valid_portfolios_ftls <- ftls %>% 
+  group_by(lpermno) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(n >= 348)
+
+valid_portfolios_crsp <- crsp %>% 
+  group_by(lpermno) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(n >= 348)
+
+valid_portfolios <- unique((valid_portfolios_crsp %>% 
+  inner_join(valid_portfolios_ftls, 
+             by = "lpermno"))$lpermno)
+```
+
+# ```{r}
+# Just some checks to see how many portfolios we drop:
+# length(valid_portfolios)
+# 
+# ftls %>%
+#   group_by(lpermno) %>%
+#   count() %>%
+#   ungroup() %>%
+#   group_by(n) %>%
+#   count() %>%
+#   filter(n <348) %>%
+#   ungroup() %>%
+#   summarize(sum(nn))
+# ```
+
+We drop a significant amount of portfolios, however this can be backed by the fact that lack of information in for some periods would result in biased results and in turn a biased analysis. 
+
+After filtering the portfolios for which we have complete dara, we merge all the data in order to have all the information we potentially need going further in our analysis.
+
+```{r}
+crsp <- crsp %>% 
+  filter(lpermno %in% valid_portfolios)
+
+ftls <- ftls %>% 
+  filter(lpermno %in% valid_portfolios)
+
 merged_data <- crsp %>% 
     left_join(ftls,
               by = c("year","month","lpermno")) %>% 
@@ -123,12 +155,27 @@ merged_data <- crsp %>%
                 select(-date),
               by = c("year","month"))  %>% 
   drop_na(c(ret,rf,b_mkt,mktrf)) %>% 
-  mutate(alpha = ret - rf - b_mkt * (mktrf - rf)) %>% 
-  mutate(date = with(merged_data, ymd(sprintf('%04s%02s%02s', year, month, day))))
+  mutate(alpha = ret - rf - b_mkt * (mktrf - rf)) 
 
-# write_feather(merged_data,
-#               "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/concat_data_2016.feather")
+# Just creating a clean date format for future use in pyhton
+
+merged_data <- merged_data %>% 
+  mutate(date = with(merged_data, ymd(sprintf('%04s%02s%02s', year, month, day))))
 ```
+
+Now that we've cleaned and formatted the data, we'll create two samples. The first one will be the in sample data which corresponds to portfolio data going from Jan 1990 to Dec 2015. The second one will be the out of sample data going from Jan 2016 till Dec 2019. We'll conduct our analysis and modelling on the in sample data and check our strategy's worth on the out of sample data.
+
+```{r}
+write_feather(merged_data %>% filter(year < 2016),
+               "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/in_sample_data.feather")
+
+write_feather(merged_data %>% filter(year >= 2016),
+               "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/out_of_sample_data.feather")
+
+write_feather(merged_data,
+               "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/full_data.feather")
+```
+
 
 # Exploratory data analysis
 
