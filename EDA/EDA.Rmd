@@ -174,8 +174,10 @@ write_feather(merged_data %>% filter(year >= 2016),
 
 write_feather(merged_data,
                "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/full_data.feather")
-```
 
+in_sample <- merged_data %>% filter(year < 2016)
+out_sample <- merged_data %>% filter(year >= 2016)
+```
 
 # Exploratory data analysis
 
@@ -186,13 +188,15 @@ Before defining any model, we need to explore the data to understand the distrib
 A first step in our analysis is identifying which portfolios have been better performing than others, taking into account the risk they took compared to the market state and their consistency across time. Let's start by ranking the portfolios according to their average alpha over the past 4 years:
 
 ```{r}
-ranking <- merged_data %>% 
+ranking <- in_sample %>% 
   group_by(lpermno) %>% 
   summarize(overperf = mean(alpha),
+            vol_alpha = sd(alpha),
+            pondered_alpha = mean(alpha)/sd(alpha),
             risk = mean(b_mkt),
             overallret = mean(ret)) %>% 
   ungroup() %>% 
-  arrange(desc(overperf)) %>% 
+  arrange(desc(overallret)) %>% 
   top_n(10)
 ranking
 ```
