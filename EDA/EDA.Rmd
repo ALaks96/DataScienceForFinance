@@ -249,4 +249,15 @@ ggplotly(p = pl_r, width = NULL, height = NULL,
   originalData = TRUE, source = "A")
 ```
 
+```{r}
+# mydata.cor <- cor(merged_data %>% 
+#                     select_if(is.numeric))
+mydata.cor = cor(merged_data %>%
+                   select_if(is.numeric) %>% 
+                   na.omit(), method = c("spearman"))
+palette = colorRampPalette(c("green", "white", "red")) (20)
+
+heatmap(x = mydata.cor, col = palette, symm = TRUE)
+
+```
 
