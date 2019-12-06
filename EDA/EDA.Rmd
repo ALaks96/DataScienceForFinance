@@ -185,8 +185,32 @@ Before defining any model, we need to explore the data to understand the distrib
 
 ## Performance/risk analysis
 
-A first step in our analysis is identifying which portfolios have been better performing than others, taking into account the risk they took compared to the market state and their consistency across time. Let's start by ranking the portfolios according to their average alpha over the past 4 years:
+### Autocorrelation - variable exploration
 
+We have a lot of variables in our data set and as we can see below, a lot of them are either highly negatively correlated or highly positively correlated. 
+
+```{r}
+mydata.cor = cor(merged_data %>%
+                   select_if(is.numeric) %>% 
+                   na.omit(), method = c("spearman"))
+palette = colorRampPalette(c("green", "white", "red")) (20)
+
+heatmap(x = mydata.cor, col = palette, symm = TRUE)
+```
+
+We're trying to identify potential variables that are correlated with key metrics of the performance of a portfolio such as alpha, returns, etc. We'll cluster the data to identify which portfolios are part of a generally better performing group to avoid mixing effects. This will be done in another script. An alternative to this is a ranking system based on metrics of performance and risk as well as consistency throughout time which we present below.
+
+### Ranking system
+
+A first step in our analysis is identifying which portfolios have been better performing than others, taking into account the risk they took compared to the market state and their consistency across time. Let's start by ranking the portfolios according to five criteria:
+
+- overperf: We take the average of the alpha of a portfolio across the whole period considered and see which have the highest.
+- vol_alpha: We take the standard deviation of the alpha of each portfolio and see the highest.
+- pondered_alpha: Using both average alpha and std of alpha, we combine both to take into account the consistency of the alpha of a portfolio.
+- overallret: Consider the average return of the portfolio over the whole period.
+- risk: We take the average risk of the portfolio considering the whole period.
+
+We'll take the top portfolios for each to 
 ```{r}
 ranking <- in_sample %>% 
   group_by(lpermno) %>% 
@@ -195,10 +219,29 @@ ranking <- in_sample %>%
             pondered_alpha = mean(alpha)/sd(alpha),
             risk = mean(b_mkt),
             overallret = mean(ret)) %>% 
-  ungroup() %>% 
+  ungroup()
+
+ranking
+
+ranking_returns <- ranking %>% 
   arrange(desc(overallret)) %>% 
   top_n(10)
-ranking
+
+ranking_alpha <- ranking %>% 
+  arrange(desc(overperf)) %>% 
+  top_n(10)
+
+ranking_palpha <- ranking %>% 
+  arrange(desc(pondered_alpha)) %>% 
+  top_n(10)
+
+ranking_vol <- ranking %>% 
+  arrange(desc(vol_alpha)) %>% 
+  top_n(10)
+
+ranking_risk <- ranking %>% 
+  arrange(desc(risk)) %>% 
+  top_n(10)
 ```
 
 Let's have an overview of their performance across time to better understand their positionning:
@@ -250,14 +293,27 @@ ggplotly(p = pl_r, width = NULL, height = NULL,
 ```
 
 ```{r}
-# mydata.cor <- cor(merged_data %>% 
-#                     select_if(is.numeric))
-mydata.cor = cor(merged_data %>%
-                   select_if(is.numeric) %>% 
+portfolios <- merged_data %>% 
+  select(lpermno,ret,date) %>% 
+  group_by(lpermno) %>% 
+  spread(lpermno,ret)
+
+portfolio_cors = cor(portfolios %>%
+                   select(-date) %>% 
                    na.omit(), method = c("spearman"))
 palette = colorRampPalette(c("green", "white", "red")) (20)
 
-heatmap(x = mydata.cor, col = palette, symm = TRUE)
+heatmap(x = portfolio_cors, col = palette, symm = TRUE)
+```
 
+```{r}
+top_portfolios <- portfolios %>% 
+  select(c(as.character(ranking$lpermno)))
+
+top_portfolio_cors = cor(top_portfolios %>%
+                   na.omit(), method = c("spearman"))
+palette = colorRampPalette(c("green", "white", "red")) (20)
+
+heatmap(x = top_portfolio_cors, col = palette, symm = TRUE)
 ```
 
