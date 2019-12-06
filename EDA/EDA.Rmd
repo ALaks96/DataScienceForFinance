@@ -69,8 +69,7 @@ ftls <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFin
                            month == "nov" ~ "11",
                            month == "dec" ~ "12",
                            TRUE ~ "0")) %>% 
-  select(-public_date) %>% 
-  mutate(date = with(ftls, dmy(sprintf('%02s%02s%04s', day, month, year))))
+  select(-public_date)
 
 
 # ff data
@@ -78,10 +77,9 @@ ftls <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFin
 ff <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/FF.csv", 
                  sep = "\t",
                  header = TRUE) %>% 
-  filter(year >= 2016) %>%
-  mutate(day = substr(date,1,2)) %>% 
-  mutate(date = with(ff, dmy(sprintf('%02s%02s%04s', day, month, year)))) %>% 
-  arrange(date)
+  filter(year >= 2016) %>% 
+  mutate(month = as.character(month),
+         year = as.character(year))
 
 
 # crsp top 100 data
@@ -89,8 +87,7 @@ ff <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinan
 crsp <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/crsp_top1000.csv", 
                  sep = "\t",
                  header = TRUE) %>% 
-  mutate(day = substr(date,1,2),
-         month = substr(date,3,5),
+  mutate(month = substr(date,3,5),
          year = substr(date,6,9)) %>% 
   filter(year >= 2016) %>% 
   mutate(month = case_when(month == "jan" ~ "1",
@@ -105,21 +102,29 @@ crsp <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFin
                            month == "oct" ~ "10",
                            month == "nov" ~ "11",
                            month == "dec" ~ "12",
-                           TRUE ~ "0")) %>% 
-  select(-date) %>% 
-  mutate(date = with(crsp, dmy(sprintf('%02s%02s%04s', day, month, year)))) 
+                           TRUE ~ "0"))
+
+valid_portfolios <- unique((crsp %>% 
+  group_by(lpermno) %>% 
+  count() %>% 
+  filter(n == 36))$lpermno)
+
+crsp <- crsp %>% 
+  filter(lpermno %in% valid_portfolios)
 ```
 
 We'll merge all the data in order to have all the information we potentially need going further in our analysis.
 
 ```{r}
-merged_data <- ftls %>% 
-  left_join(crsp %>%
-              select(-c(day,month,year)),
-            by = c("lpermno","date")) %>% 
-  left_join(ff %>% 
-              select(-c(day,month,year)),
-            by = "date")
+merged_data <- crsp %>% 
+    left_join(ftls,
+              by = c("year","month","lpermno")) %>% 
+    left_join(ff %>% 
+                select(-date),
+              by = c("year","month"))  %>% 
+  drop_na(c(ret,rf,b_mkt,mktrf)) %>% 
+  mutate(alpha = ret - rf - b_mkt * (mktrf - rf)) %>% 
+  mutate(date = with(merged_data, ymd(sprintf('%04s%02s%02s', year, month, day))))
 
 # write_feather(merged_data,
 #               "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/concat_data_2016.feather")
@@ -135,8 +140,6 @@ A first step in our analysis is identifying which portfolios have been better pe
 
 ```{r}
 ranking <- merged_data %>% 
-  drop_na(c(ret,rf,b_mkt,mktrf)) %>% 
-  mutate(alpha = ret - rf - b_mkt * (mktrf - rf)) %>% 
   group_by(lpermno) %>% 
   summarize(overperf = mean(alpha),
             risk = mean(b_mkt),
@@ -150,6 +153,49 @@ ranking
 Let's have an overview of their performance across time to better understand their positionning:
 
 ```{r}
+par(mfrow=c(2,2))
+pl_a <- merged_data %>% 
+  filter(lpermno %in% c(ranking$lpermno)) %>% 
+  mutate(lpermno = as.factor(lpermno)) %>% 
+  ggplot() +
+  aes(x = date, y = alpha, color = lpermno) +
+  geom_point() +
+  geom_line(aes(group=lpermno)) +
+  theme_bw() +
+  ggtitle('Evolution of alpha over time') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+pl_b <- merged_data %>% 
+  filter(lpermno %in% c(ranking$lpermno)) %>% 
+  mutate(lpermno = as.factor(lpermno)) %>% 
+  ggplot() +
+  aes(x = date, y = b_mkt, color = lpermno) +
+  geom_point() +
+  geom_line(aes(group=lpermno)) +
+  theme_bw() +
+  ggtitle('Evolution of beta over time') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+pl_r <- merged_data %>% 
+  filter(lpermno %in% c(ranking$lpermno)) %>% 
+  mutate(lpermno = as.factor(lpermno)) %>% 
+  ggplot() +
+  aes(x = date, y = ret, color = lpermno) +
+  geom_point() +
+  geom_line(aes(group=lpermno)) +
+  theme_bw() +
+  ggtitle('Evolution of returns over time')  +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
+ggplotly(p = pl_a, width = NULL, height = NULL,
+  tooltip = "all", dynamicTicks = FALSE, layerData = 1,
+  originalData = TRUE, source = "A")
+
+ggplotly(p = pl_b, width = NULL, height = NULL,
+  tooltip = "all", dynamicTicks = FALSE, layerData = 1,
+  originalData = TRUE, source = "A")
+
+ggplotly(p = pl_r, width = NULL, height = NULL,
+  tooltip = "all", dynamicTicks = FALSE, layerData = 1,
+  originalData = TRUE, source = "A")
 ```
+
 
