@@ -25,6 +25,7 @@ library(kableExtra)
 library(broom)
 library(lubridate)
 library(feather)
+library(reshape2)
 ```
 
 # Data formatting
@@ -35,16 +36,16 @@ We have three datasets which we can concatenate by date or by date and identifie
 - crsp_top1000.csv : information on stock returns and other stock characteristics for each identifier at a given date.
 - FF.csv : information on characteristics of the global market for each month of years 1990 to 2019. 
 
-From these data we obtain a significant amount of variables and rows. We need to find focus point to avoid a chaotic analysis. A first lead would be to check for performance of certain portfolios across time for recent years. An indicator we can calculate and is missing from the data is the alpha or Jensen index which can be derived from the portfolio return formula:
+From these data we obtain a significant amount of variables and rows. We need to find focus point to avoid a chaotic analysis. A first lead would be to check for performance of certain stocks across time for recent years. An indicator we can calculate and is missing from the data is the alpha or Jensen index which can be derived from the stock return formula:
 
 r = Rf + beta * (Rm – Rf) + Alpha
 <=> Alpha = r – Rf  – beta * (Rm – Rf)
 
 where:
 
-r = the security’s or portfolio’s return
+r = the security’s or stock’s return
 Rf  = the risk-free rate of return
-beta = systemic risk of a portfolio (the security’s or portfolio’s price volatility relative to the overall market)
+beta = systemic risk of a stock (the security’s or stock’s price volatility relative to the overall market)
 Rm  = the market return
 
 ```{r}
@@ -102,7 +103,7 @@ crsp <- read.csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFin
                            TRUE ~ "0"))
 ```
 
-We'll keep data only on portfolios for which we have data on the whole period we consider. To do this, we check which portfolios have the max number of dates in both fundamentals and crsp, we then retrieve the portfolio identifiers and keep only those in common. m
+We'll keep data only on stocks for which we have data on the whole period we consider. To do this, we check which stocks have the max number of dates in both fundamentals and crsp, we then retrieve the stock identifiers and keep only those in common. m
 
 ```{r}
 valid_portfolios_ftls <- ftls %>% 
@@ -137,9 +138,9 @@ valid_portfolios <- unique((valid_portfolios_crsp %>%
 #   summarize(sum(nn))
 # ```
 
-We drop a significant amount of portfolios, however this can be backed by the fact that lack of information in for some periods would result in biased results and in turn a biased analysis. 
+We drop a significant amount of stocks, however this can be backed by the fact that lack of information in for some periods would result in biased results and in turn a biased analysis. 
 
-After filtering the portfolios for which we have complete dara, we merge all the data in order to have all the information we potentially need going further in our analysis.
+After filtering the stocks for which we have complete dara, we merge all the data in order to have all the information we potentially need going further in our analysis.
 
 ```{r}
 crsp <- crsp %>% 
@@ -163,7 +164,7 @@ merged_data <- merged_data %>%
   mutate(date = with(merged_data, ymd(sprintf('%04s%02s%02s', year, month, day))))
 ```
 
-Now that we've cleaned and formatted the data, we'll create two samples. The first one will be the in sample data which corresponds to portfolio data going from Jan 1990 to Dec 2015. The second one will be the out of sample data going from Jan 2016 till Dec 2019. We'll conduct our analysis and modelling on the in sample data and check our strategy's worth on the out of sample data.
+Now that we've cleaned and formatted the data, we'll create two samples. The first one will be the in sample data which corresponds to stock data going from Jan 1990 to Dec 2015. The second one will be the out of sample data going from Jan 2016 till Dec 2019. We'll conduct our analysis and modelling on the in sample data and check our strategy's worth on the out of sample data.
 
 ```{r}
 write_feather(merged_data %>% filter(year < 2016),
@@ -198,19 +199,19 @@ palette = colorRampPalette(c("green", "white", "red")) (20)
 heatmap(x = mydata.cor, col = palette, symm = TRUE)
 ```
 
-We're trying to identify potential variables that are correlated with key metrics of the performance of a portfolio such as alpha, returns, etc. We'll cluster the data to identify which portfolios are part of a generally better performing group to avoid mixing effects. This will be done in another script. An alternative to this is a ranking system based on metrics of performance and risk as well as consistency throughout time which we present below.
+We're trying to identify potential variables that are correlated with key metrics of the performance of a stock such as alpha, returns, etc. We'll cluster the data to identify which stocks are part of a generally better performing group to avoid mixing effects. This will be done in another script. An alternative to this is a ranking system based on metrics of performance and risk as well as consistency throughout time which we present below.
 
 ### Ranking system
 
-A first step in our analysis is identifying which portfolios have been better performing than others, taking into account the risk they took compared to the market state and their consistency across time. Let's start by ranking the portfolios according to five criteria:
+A first step in our analysis is identifying which stocks have been better performing than others, taking into account the risk they took compared to the market state and their consistency across time. Let's start by ranking the portfolios according to five criteria:
 
-- overperf: We take the average of the alpha of a portfolio across the whole period considered and see which have the highest.
-- vol_alpha: We take the standard deviation of the alpha of each portfolio and see the highest.
-- pondered_alpha: Using both average alpha and std of alpha, we combine both to take into account the consistency of the alpha of a portfolio.
-- overallret: Consider the average return of the portfolio over the whole period.
-- risk: We take the average risk of the portfolio considering the whole period.
+- overperf: We take the average of the alpha of a stock across the whole period considered and see which have the highest.
+- vol_alpha: We take the standard deviation of the alpha of each stock and see the highest.
+- pondered_alpha: Using both average alpha and std of alpha, we combine both to take into account the consistency of the alpha of a stock.
+- overallret: Consider the average return of the stock over the whole period.
+- risk: We take the average risk of the stock considering the whole period.
 
-We'll take the top portfolios for each and create groups for each to benchmark the same metrics but on non-aggregated time series data.
+We'll take the top stocks for each and create groups for each to benchmark the same metrics but on non-aggregated time series data.
 
 ```{r}
 ranking <- out_sample %>% 
@@ -245,7 +246,7 @@ ranking_risk <- as.character(unique(ranking %>%
   top_n(10))$lpermno)
 ```
 
-Now that we have the portfolios for each ranking metric, we'll create groups to better identify them.
+Now that we have the stocks for each ranking metric, we'll create groups to better identify them.
 
 ```{r}
 ten_ret <- merged_data %>% 
@@ -293,7 +294,6 @@ step1 %>%
   group_by(lpermno) %>% 
   count()
 ```
-
 
 Let's have an overview of their performance across time to better understand their positionning:
 
@@ -343,28 +343,58 @@ ggplotly(p = pl_r, width = NULL, height = NULL,
   originalData = TRUE, source = "A")
 ```
 
+We can see that we consistently obtain the same stocks for all rankings. These may be stocks we coud choose for a portfolio.
+However, we want our stocks to be the least correlated possible. We can check for that by looking at returns of all the stocks we have and filtering those which the correlation is below a certain threshold. 
+
+# Uncorrelated stocks
+
+In order to diversify risk, we'll search for the least correlated stocks in our data and check if they concur with the stocks that have the highest ranking stocks in terms of return, alpha, etc.
+
 ```{r}
+# Transforming data to have stock identifiers as columns and rows as returns.
 portfolios <- merged_data %>% 
   select(lpermno,ret,date) %>% 
   group_by(lpermno) %>% 
   spread(lpermno,ret)
 
-portfolio_cors = cor(portfolios %>%
+# Creating correlation matrix and filter those with abs value below 0.05
+cc <- cor(portfolios %>%
                    select(-date) %>% 
                    na.omit(), method = c("spearman"))
+
+threshold <- 0.0005
+cc0 <- cc
+diag(cc0) <- 0
+ok <- apply(abs(cc0) <= threshold, 1, any)
+stonk_matrix <- cc[ok, ok]
+
+# Creating a dataframe from the subset of ids for future use
+stonk_dataframe <- subset(melt(cc), value < threshold & value > -threshold)
+
+# Generating plot for correlation matrix
 palette = colorRampPalette(c("green", "white", "red")) (20)
+heatmap(x = stonk_matrix, col = palette, symm = TRUE)
 
-heatmap(x = portfolio_cors, col = palette, symm = TRUE)
-```
+# Retrieving id's satisfying our condition
+stonks <- unique(c(stonk_dataframe$Var1, stonk_dataframe$Var2))
 
-```{r}
-top_portfolios <- portfolios %>% 
-  select(c(as.character(ranking$lpermno)))
+#filtering for those ids
+uncorrelated_stonks <- merged_data %>% 
+  filter(lpermno %in% as.character(stonks))
 
-top_portfolio_cors = cor(top_portfolios %>%
-                   na.omit(), method = c("spearman"))
-palette = colorRampPalette(c("green", "white", "red")) (20)
+# plotting their returns over the whole period from the original data
+pl_u <- uncorrelated_stonks %>% 
+  mutate(lpermno = as.factor(lpermno)) %>% 
+  ggplot() +
+  aes(x = date, y = ret, color = lpermno) +
+  geom_point() +
+  geom_line(aes(group=lpermno)) +
+  theme_bw() +
+  ggtitle('Evolution of returns over time')  +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
-heatmap(x = top_portfolio_cors, col = palette, symm = TRUE)
+ggplotly(p = pl_u, width = NULL, height = NULL,
+  tooltip = "all", dynamicTicks = FALSE, layerData = 1,
+  originalData = TRUE, source = "A")
 ```
 
