@@ -26,6 +26,10 @@ library(broom)
 library(lubridate)
 library(feather)
 library(reshape2)
+library(tibbletime)
+library(plotly)
+#install.packages("tidyverse")
+#install.packages("tibbletime")
 ```
 
 # Data formatting
@@ -176,6 +180,8 @@ write_feather(merged_data %>% filter(year >= 2016),
 write_feather(merged_data,
                "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/full_data.feather")
 
+
+merged_data <- read_feather("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/full_data.feather")
 in_sample <- merged_data %>% filter(year < 2016)
 out_sample <- merged_data %>% filter(year >= 2016)
 ```
@@ -223,9 +229,7 @@ ranking <- merged_data %>%
 ranking
 ```
 
-We will use these criteria to focus our approach in two steps. First we want to select the best industries in terms of returns over the whole period considered. We arbirtrarily choose ten industries to reduce the scope of our selection. 
-Then, among each industry we will select the top ten best stocks in terms of alpha (i.e. the most overperforming ones).
-We )
+We'll start by looking at the top ten best and worst stocks in terms of the above criteria to get a better understanding of how our sotcks are distributed.
 
 #### Top ten best
 
@@ -242,7 +246,7 @@ ranking_alpha <- as.character(unique(ranking %>%
 
 ranking_palpha <- as.character(unique(ranking %>% 
   arrange(desc(pondered_alpha)) %>% 
-  top_n(10))lpermno)
+  top_n(10))$lpermno)
 
 ranking_vol <- as.character(unique(ranking %>% 
   arrange(desc(vol_alpha)) %>% 
@@ -350,7 +354,7 @@ ggplotly(p = pl_r, width = NULL, height = NULL,
   originalData = TRUE, source = "A")
 ```
 
-We can see that we consistently obtain the same stocks for all rankings. These may be stocks we coud choose for a portfolio.
+We can see that we consistently obtain the same stocks for all rankings which isn't what we're aiming for. Nonetheless, we can see that across time volatility has clearly decreased for the lump of stocks considered here. 
 
 #### Top ten worst 
 
@@ -490,10 +494,9 @@ ggplotly(p = pl_r_w, width = NULL, height = NULL,
 ```
 
 
-However, we want our stocks to be the least correlated possible. We can check for that by looking at returns of all the stocks we have and filtering those which the correlation is below a certain threshold. 
-
 # Uncorrelated stocks
 
+However, we want our stocks to be the least correlated possible. We can check for that by looking at returns of all the stocks we have and filtering those which the correlation is below a certain threshold. 
 In order to diversify risk, we'll search for the least correlated stocks in our data and check if they concur with the stocks that have the highest ranking stocks in terms of return, alpha, etc.
 
 ```{r}
@@ -548,25 +551,81 @@ ggplotly(p = pl_u, width = NULL, height = NULL,
 
 # Industry selection
 
-Another approach to get better insights onwhich stocks would be most interesting is to focus on specific industries. We'll create a ranking system similar to what we previously did on stocks, aggregating however on industrial codes.
+Another approach to get better insights onwhich stocks would be most interesting is to focus on specific industries. To do this, we start by computing the rolling average of returns of each stock with a window of 12 months. We then compute the average per industry of these rolling averages for each month/year and keep only the top 10 industries according to that metric for each date. We then count how many times an industry code appears and again select the top 10 most appearing industries. 
 
 ```{r}
-top_industries <- merged_data %>% 
-  group_by(siccd) %>% 
-  mutate(nb_of_ent = n()) %>% 
+rolling_mean <- rollify(mean, window = 12)
+  
+top_indus <- merged_data %>% 
+  group_by(lpermno) %>% 
+  mutate(mean_12 = rolling_mean(ret)) %>% 
   ungroup() %>% 
-  filter(nb_of_ent > 50) %>% 
-  select(-nb_of_ent) %>% 
-  group_by(siccd) %>% 
-  summarize(overperf = mean(alpha),
-            vol_alpha = sd(alpha),
-            pondered_alpha = mean(alpha)/sd(alpha),
-            risk = mean(b_mkt),
-            overallret = mean(ret)) %>% 
+  group_by(siccd,year,month) %>% 
+  summarize(av_ret = mean(mean_12)) %>%
   ungroup() %>% 
-  arrange(desc(overperf))
+  group_by(year,month) %>% 
+  top_n(10,av_ret) %>%
+  ungroup() %>% 
+  arrange(as.numeric(year),as.numeric(month)) %>% 
+  mutate(date = with(top_indus, sprintf("%s-%02s", year, month))) 
 
+pl_indus <- top_indus %>% 
+  ggplot() +
+  aes(x = date, y = siccd, color = av_ret) %>% 
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 45))
 
+ggplotly(p = pl_indus, width = NULL, height = NULL,
+  tooltip = "all", dynamicTicks = FALSE, layerData = 1,
+  originalData = TRUE, source = "A")
+
+top_10_best <- (top_indus %>% 
+  group_by(siccd) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)))[1:10,]$siccd
+
+# for Rick #
+# rolling_data <- merged_data %>% 
+#   group_by(lpermno) %>% 
+#   mutate(rolling_ret_12 = rolling_mean(ret)) %>% 
+#   ungroup()
+# write_feather(rolling_data,
+#               "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/rolling_data.feather")
 ```
 
+We then go through this same process only to select the top 10 worst industries in terms of returns using the same methodology
+
+```{r}
+rolling_mean <- rollify(mean, window = 12)
+  
+worst_indus <- merged_data %>% 
+  group_by(lpermno) %>% 
+  mutate(mean_12 = rolling_mean(ret)) %>% 
+  ungroup() %>% 
+  group_by(siccd,year,month) %>% 
+  summarize(av_ret = mean(mean_12)) %>%
+  ungroup() %>% 
+  group_by(year,month) %>% 
+  top_n(-10,av_ret) %>%
+  ungroup() %>% 
+  arrange(as.numeric(year),as.numeric(month)) %>% 
+  mutate(date = with(top_indus, sprintf("%s-%02s", year, month))) 
+
+pl_indus_w <- worst_indus %>% 
+  ggplot() +
+  aes(x = date, y = siccd, color = av_ret) %>% 
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 45))
+
+ggplotly(p = pl_indus_w, width = NULL, height = NULL,
+  tooltip = "all", dynamicTicks = FALSE, layerData = 1,
+  originalData = TRUE, source = "A")
+
+top_10_worst <- (worst_indus %>% 
+  group_by(siccd) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)))[1:10,]$siccd
+```
 
