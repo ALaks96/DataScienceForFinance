@@ -211,10 +211,8 @@ A first step in our analysis is identifying which stocks have been better perfor
 - overallret: Consider the average return of the stock over the whole period.
 - risk: We take the average risk of the stock considering the whole period.
 
-We'll take the top stocks for each and create groups for each to benchmark the same metrics but on non-aggregated time series data.
-
 ```{r}
-ranking <- out_sample %>% 
+ranking <- merged_data %>% 
   group_by(lpermno) %>% 
   summarize(overperf = mean(alpha),
             vol_alpha = sd(alpha),
@@ -222,9 +220,18 @@ ranking <- out_sample %>%
             risk = mean(b_mkt),
             overallret = mean(ret)) %>% 
   ungroup()
-
 ranking
+```
 
+We will use these criteria to focus our approach in two steps. First we want to select the best industries in terms of returns over the whole period considered. We arbirtrarily choose ten industries to reduce the scope of our selection. 
+Then, among each industry we will select the top ten best stocks in terms of alpha (i.e. the most overperforming ones).
+We )
+
+#### Top ten best
+
+We'll take the top stocks for each and create groups for each to benchmark the same metrics but on non-aggregated time series data.
+
+```{r}
 ranking_returns <- as.character(unique(ranking %>% 
   arrange(desc(overallret)) %>% 
   top_n(10))$lpermno)
@@ -235,7 +242,7 @@ ranking_alpha <- as.character(unique(ranking %>%
 
 ranking_palpha <- as.character(unique(ranking %>% 
   arrange(desc(pondered_alpha)) %>% 
-  top_n(10))$lpermno)
+  top_n(10))lpermno)
 
 ranking_vol <- as.character(unique(ranking %>% 
   arrange(desc(vol_alpha)) %>% 
@@ -344,6 +351,145 @@ ggplotly(p = pl_r, width = NULL, height = NULL,
 ```
 
 We can see that we consistently obtain the same stocks for all rankings. These may be stocks we coud choose for a portfolio.
+
+#### Top ten worst 
+
+Now we should look at the worst performing stocks according to the same criteria:
+
+```{r}
+ranking_returns_w <- as.character(unique(ranking %>% 
+  arrange(desc(overallret)) %>% 
+  top_n(10))$lpermno)
+
+ranking_alpha_w <- as.character(unique(ranking %>% 
+  arrange(overperf) %>% 
+  top_n(10))$lpermno)
+
+ranking_palpha_w <- as.character(unique(ranking %>% 
+  arrange(pondered_alpha) %>% 
+  top_n(10))$lpermno)
+
+ranking_vol_w <- as.character(unique(ranking %>% 
+  arrange(vol_alpha) %>% 
+  top_n(10))$lpermno)
+
+ranking_risk_w <- as.character(unique(ranking %>% 
+  arrange(risk) %>% 
+  top_n(10))$lpermno)
+
+
+ranking %>% 
+  ggplot() +
+  aes(x = overperf) +
+  geom_histogram()
+
+ranking <- merged_data %>% 
+  group_by(siccd) %>% 
+  summarize(overperf = mean(alpha),
+            vol_alpha = sd(alpha),
+            pondered_alpha = mean(alpha)/sd(alpha),
+            risk = mean(b_mkt),
+            overallret = mean(ret)) %>% 
+  ungroup() %>% 
+  arrange(desc(overallret))
+
+ranking <- ranking[1:10,]
+```
+
+```{r}
+ten_ret_w <- merged_data %>% 
+  filter(lpermno %in% ranking_returns) %>% 
+  mutate(group = "top ten worst returns")
+
+ten_alp_w <- merged_data %>% 
+  filter(lpermno %in% ranking_alpha) %>% 
+  mutate(group = "top ten worst alpha")
+
+ten_pal_w <- merged_data %>% 
+  filter(lpermno %in% ranking_palpha) %>% 
+  mutate(group = "top ten worst pondered alpha")
+
+ten_vol_w <- merged_data %>% 
+  filter(lpermno %in% ranking_vol) %>% 
+  mutate(group = "top ten worst inconsistent")
+
+ten_rsk_w <- merged_data %>% 
+  filter(lpermno %in% ranking_risk) %>% 
+  mutate(group = "top ten worst risk")
+
+step1w <- ten_ret_w %>% 
+  rbind(ten_alp_w) %>% 
+  rbind(ten_pal_w) %>% 
+  rbind(ten_vol_w) %>% 
+  rbind(ten_rsk_w) %>%
+  mutate(i1 = row_number())
+
+# remove duplicated in a seperate data frame
+step2w <- step1w %>%
+  select(-group) %>%
+  distinct()
+
+# filter the duplicated in the original data frame without dropping group variable
+top_tier_w <- step1w %>%
+  filter(i1 %in% as.character(step2w$i1)) %>%
+  select(-i1)
+
+#unique(step1$group)
+
+#test <- unique(c(ranking_alpha,ranking_palpha,ranking_returns,ranking_risk,ranking_vol))
+step1 %>% 
+  select(lpermno) %>% 
+  group_by(lpermno) %>% 
+  count()
+```
+
+```{r}
+par(mfrow=c(2,2))
+pl_a_w <- top_tier %>% 
+  mutate(lpermno = as.factor(lpermno),
+         group = as.factor(group)) %>% 
+  ggplot() +
+  aes(x = date, y = alpha, color = lpermno) +
+  geom_point() +
+  geom_line(aes(group=lpermno)) +
+  theme_bw() +
+  ggtitle('Evolution of alpha over time') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+pl_b_w <- top_tier %>% 
+  mutate(lpermno = as.factor(lpermno),
+         group = as.factor(group)) %>% 
+  ggplot() +
+  aes(x = date, y = b_mkt, color = lpermno) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  ggtitle('Evolution of beta over time') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+pl_r_w <- top_tier %>% 
+  mutate(lpermno = as.factor(lpermno),
+         group = as.factor(group)) %>% 
+  ggplot() +
+  aes(x = date, y = ret, color = lpermno) +
+  geom_point() +
+  geom_line(aes(group=lpermno)) +
+  theme_bw() +
+  ggtitle('Evolution of returns over time')  +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+ggplotly(p = pl_a_w, width = NULL, height = NULL,
+  tooltip = "all", dynamicTicks = FALSE, layerData = 1,
+  originalData = TRUE, source = "A")
+
+ggplotly(p = pl_b_w, width = NULL, height = NULL,
+  tooltip = "all", dynamicTicks = FALSE, layerData = 1,
+  originalData = TRUE, source = "A")
+
+ggplotly(p = pl_r_w, width = NULL, height = NULL,
+  tooltip = "all", dynamicTicks = FALSE, layerData = 1,
+  originalData = TRUE, source = "A")
+```
+
+
 However, we want our stocks to be the least correlated possible. We can check for that by looking at returns of all the stocks we have and filtering those which the correlation is below a certain threshold. 
 
 # Uncorrelated stocks
@@ -360,13 +506,15 @@ portfolios <- merged_data %>%
 # Creating correlation matrix and filter those with abs value below 0.05
 cc <- cor(portfolios %>%
                    select(-date) %>% 
-                   na.omit(), method = c("spearman"))
+                   na.omit(),
+          method = c("spearman"))
 
 threshold <- 0.0005
 cc0 <- cc
 diag(cc0) <- 0
 ok <- apply(abs(cc0) <= threshold, 1, any)
 stonk_matrix <- cc[ok, ok]
+cc[abs(cc) < 0.005] <- NA
 
 # Creating a dataframe from the subset of ids for future use
 stonk_dataframe <- subset(melt(cc), value < threshold & value > -threshold)
@@ -397,4 +545,28 @@ ggplotly(p = pl_u, width = NULL, height = NULL,
   tooltip = "all", dynamicTicks = FALSE, layerData = 1,
   originalData = TRUE, source = "A")
 ```
+
+# Industry selection
+
+Another approach to get better insights onwhich stocks would be most interesting is to focus on specific industries. We'll create a ranking system similar to what we previously did on stocks, aggregating however on industrial codes.
+
+```{r}
+top_industries <- merged_data %>% 
+  group_by(siccd) %>% 
+  mutate(nb_of_ent = n()) %>% 
+  ungroup() %>% 
+  filter(nb_of_ent > 50) %>% 
+  select(-nb_of_ent) %>% 
+  group_by(siccd) %>% 
+  summarize(overperf = mean(alpha),
+            vol_alpha = sd(alpha),
+            pondered_alpha = mean(alpha)/sd(alpha),
+            risk = mean(b_mkt),
+            overallret = mean(ret)) %>% 
+  ungroup() %>% 
+  arrange(desc(overperf))
+
+
+```
+
 
