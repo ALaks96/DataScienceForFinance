@@ -209,7 +209,7 @@ We're trying to identify potential variables that are correlated with key metric
 
 ### Ranking system
 
-A first step in our analysis is identifying which stocks have been better performing than others, taking into account the risk they took compared to the market state and their consistency across time. Let's start by ranking the portfolios according to five criteria:
+A first step in our analysis is identifying which stocks have been better performing than others, taking into account their risk compared to the market state and their consistency across time. Let's start by ranking the portfolios according to five criteria:
 
 - overperf: We take the average of the alpha of a stock across the whole period considered and see which have the highest.
 - vol_alpha: We take the standard deviation of the alpha of each stock and see the highest.
@@ -441,11 +441,13 @@ top_tier_w <- step1w %>%
 #unique(step1$group)
 
 #test <- unique(c(ranking_alpha,ranking_palpha,ranking_returns,ranking_risk,ranking_vol))
-step1 %>% 
-  select(lpermno) %>% 
-  group_by(lpermno) %>% 
-  count()
+# step1 %>% 
+#   select(lpermno) %>% 
+#   group_by(lpermno) %>% 
+#   count()
 ```
+
+Now to visually represent them:
 
 ```{r}
 par(mfrow=c(2,2))
@@ -494,7 +496,7 @@ ggplotly(p = pl_r_w, width = NULL, height = NULL,
 ```
 
 
-# Uncorrelated stocks
+#### Uncorrelated stocks
 
 However, we want our stocks to be the least correlated possible. We can check for that by looking at returns of all the stocks we have and filtering those which the correlation is below a certain threshold. 
 In order to diversify risk, we'll search for the least correlated stocks in our data and check if they concur with the stocks that have the highest ranking stocks in terms of return, alpha, etc.
@@ -549,9 +551,9 @@ ggplotly(p = pl_u, width = NULL, height = NULL,
   originalData = TRUE, source = "A")
 ```
 
-# Industry selection
+#### Industry selection
 
-Another approach to get better insights onwhich stocks would be most interesting is to focus on specific industries. To do this, we start by computing the rolling average of returns of each stock with a window of 12 months. We then compute the average per industry of these rolling averages for each month/year and keep only the top 10 industries according to that metric for each date. We then count how many times an industry code appears and again select the top 10 most appearing industries. 
+Another approach to get better insights onwhich stocks would be most interesting is to focus on specific industries. To do this, we start by computing the rolling average of returns of each stock with a window of 12 months. We then compute the average per industry of these rolling averages for each month/year and keep only the top 10 industries according to that metric for each date. 
 
 ```{r}
 rolling_mean <- rollify(mean, window = 12)
@@ -569,7 +571,7 @@ top_indus <- merged_data %>%
   arrange(as.numeric(year),as.numeric(month)) %>% 
   mutate(date = with(top_indus, sprintf("%s-%02s", year, month))) 
 
-pl_indus <- top_indus %>% 
+spl_indus <- top_indus %>% 
   ggplot() +
   aes(x = date, y = siccd, color = av_ret) %>% 
   geom_point() +
@@ -629,3 +631,81 @@ top_10_worst <- (worst_indus %>%
   arrange(desc(n)))[1:10,]$siccd
 ```
 
+```{r}
+data1 <- read_csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/please.csv")
+
+best_10 <- unique(((data1 %>% 
+  filter(year == "2016" & month == "1") %>% 
+  group_by(siccd) %>% 
+  summarize(roll_av_av = mean(rolling_ret_12)) %>% 
+  ungroup() %>% 
+  arrange(desc(roll_av_av))))[1:10,]$siccd)
+
+worst_10 <- unique(((data1 %>% 
+  filter(year == "2016" & month == "1") %>% 
+  group_by(siccd) %>% 
+  summarize(roll_av_av = mean(rolling_ret_12)) %>% 
+  ungroup() %>% 
+  arrange(roll_av_av)))[1:10,]$siccd)
+valid_indus <- c(best_10, worst_10)
+```
+
+```{r}
+# After checking qualitatively which variables made sense in a hypothetical regression to maximize alpha...
+data <- read_csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/regression_ready.csv")
+
+in_sample <- data %>% 
+  select(c(capei,bm,evm,pe_op_basic,pe_exi,pe_inc,ps,pcf,dpr,npm,opmbd,opmad,gpm,ptpm,cfm,roa,roe,roce,efftax,aftret_eq,aftret_invcapx,aftret_equity,pretret_noa,pretret_earnat,gprof,equity_invcap,debt_invcap,totdebt_invcap,capital_ratio,int_debt,int_totdebt,cash_lt,rect_act,debt_at,debt_ebitda,short_debt,curr_debt,lt_debt,profit_lct,ocf_lct,cash_debt,fcf_ocf,lt_ppent,dltt_be,debt_assets,debt_capital,de_ratio,intcov,intcov_ratio,cash_ratio,quick_ratio,curr_ratio,at_turn,rect_turn,sale_invcap,sale_equity,sale_nwc,rd_sale,adv_sale,staff_sale,accrual,ptb,peg_trailing,peg_1yrforward,peg_ltgforward,alpha_next,siccd,year)) %>% 
+  filter(year < 2016) %>% 
+  select(-year)
+out_sample <- data %>% 
+  select(c(capei,bm,evm,pe_op_basic,pe_exi,pe_inc,ps,pcf,dpr,npm,opmbd,opmad,gpm,ptpm,cfm,roa,roe,roce,efftax,aftret_eq,aftret_invcapx,aftret_equity,pretret_noa,pretret_earnat,gprof,equity_invcap,debt_invcap,totdebt_invcap,capital_ratio,int_debt,int_totdebt,cash_lt,rect_act,debt_at,debt_ebitda,short_debt,curr_debt,lt_debt,profit_lct,ocf_lct,cash_debt,fcf_ocf,lt_ppent,dltt_be,debt_assets,debt_capital,de_ratio,intcov,intcov_ratio,cash_ratio,quick_ratio,curr_ratio,at_turn,rect_turn,sale_invcap,sale_equity,sale_nwc,rd_sale,adv_sale,staff_sale,accrual,ptb,peg_trailing,peg_1yrforward,peg_ltgforward,alpha_next,siccd,year)) %>% 
+  filter(year >= 2016) %>% 
+  select(-year)
+
+# We then initialize a null model, a full model and apply a stepwise selection method to isolate for each industry which accounting features could be considered for optimizing a portfolio. We loop through every industry to isolate for market effects. 
+n <- 0
+acc_gen <- 0
+
+for (indus in valid_indus){
+  print(indus)
+  temp_out <- out_sample %>%
+                   filter(siccd == indus) %>% 
+                   select(-siccd)
+  temp2 <- in_sample %>%
+                   filter(siccd == indus) %>% 
+                   select(-siccd)
+  if (indus == "6211"){
+    temp2 <- temp2 %>% 
+      select(-int_totdebt)
+  }
+  temp3 <- temp2[, colSums(is.na(temp2)) != nrow(temp2)]
+  
+  null_model <- lm(alpha_next ~ 1 , data = temp3 %>% na.omit())
+  full_model <- lm(alpha_next ~ . , data = temp3 %>% na.omit()) 
+  stepwise_selec <- step(null_model,
+                       direction = "both",
+                       scope = list(upper=full_model,lower = null_model),
+                       trace=0)
+  print(summary(stepwise_selec))
+  new_alpha <- predict(stepwise_selec, 
+          temp_out
+          #%>% select(names(stepwise_selec$coefficients)[2:length(stepwise_selec$coefficients)])
+          )
+  temp4 <- temp_out %>% 
+    cbind(new_alpha) %>% 
+    mutate(acc = (new_alpha - alpha_next)) %>% 
+    summarize(mean(acc))
+  
+  if (is.na(temp4$`mean(acc)`) == FALSE) {
+    n <- n + 1
+    acc_gen <- acc_gen + temp4$`mean(acc)`
+    
+  }
+}
+
+acc_gen/n
+temp4$`mean(acc)`
+```
+
+Across each industry we compute the mean difference in 
