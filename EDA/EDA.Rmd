@@ -551,7 +551,7 @@ ggplotly(p = pl_u, width = NULL, height = NULL,
   originalData = TRUE, source = "A")
 ```
 
-#### Industry selection
+# Regression analysis and Industry selection
 
 Another approach to get better insights onwhich stocks would be most interesting is to focus on specific industries. To do this, we start by computing the rolling average of returns of each stock with a window of 12 months. We then compute the average per industry of these rolling averages for each month/year and keep only the top 10 industries according to that metric for each date. 
 
@@ -571,15 +571,16 @@ top_indus <- merged_data %>%
   arrange(as.numeric(year),as.numeric(month)) %>% 
   mutate(date = with(top_indus, sprintf("%s-%02s", year, month))) 
 
-spl_indus <- top_indus %>% 
+pl_indus <- top_indus %>% 
   ggplot() +
   aes(x = date, y = siccd, color = av_ret) %>% 
   geom_point() +
   theme(axis.text.x = element_text(angle = 45))
 
-ggplotly(p = pl_indus, width = NULL, height = NULL,
+pl_indus_plty <- ggplotly(p = pl_indus, width = NULL, height = NULL,
   tooltip = "all", dynamicTicks = FALSE, layerData = 1,
   originalData = TRUE, source = "A")
+htmlwidgets::saveWidget(pl_indus_plty, file = "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/image_bibapboup_top10.html")
 
 top_10_best <- (top_indus %>% 
   group_by(siccd) %>% 
@@ -620,9 +621,11 @@ pl_indus_w <- worst_indus %>%
   geom_point() +
   theme(axis.text.x = element_text(angle = 45))
 
-ggplotly(p = pl_indus_w, width = NULL, height = NULL,
+pl_indus_w_plty <- ggplotly(p = pl_indus_w, width = NULL, height = NULL,
   tooltip = "all", dynamicTicks = FALSE, layerData = 1,
   originalData = TRUE, source = "A")
+
+htmlwidgets::saveWidget(pl_indus_w_plty, file = "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/image_bibapboup_worst10.html")
 
 top_10_worst <- (worst_indus %>% 
   group_by(siccd) %>% 
@@ -655,26 +658,25 @@ valid_indus <- c(best_10, worst_10)
 data <- read_csv("~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/regression_ready.csv")
 
 in_sample <- data %>% 
-  select(c(capei,bm,evm,pe_op_basic,pe_exi,pe_inc,ps,pcf,dpr,npm,opmbd,opmad,gpm,ptpm,cfm,roa,roe,roce,efftax,aftret_eq,aftret_invcapx,aftret_equity,pretret_noa,pretret_earnat,gprof,equity_invcap,debt_invcap,totdebt_invcap,capital_ratio,int_debt,int_totdebt,cash_lt,rect_act,debt_at,debt_ebitda,short_debt,curr_debt,lt_debt,profit_lct,ocf_lct,cash_debt,fcf_ocf,lt_ppent,dltt_be,debt_assets,debt_capital,de_ratio,intcov,intcov_ratio,cash_ratio,quick_ratio,curr_ratio,at_turn,rect_turn,sale_invcap,sale_equity,sale_nwc,rd_sale,adv_sale,staff_sale,accrual,ptb,peg_trailing,peg_1yrforward,peg_ltgforward,alpha_next,siccd,year)) %>% 
-  filter(year < 2016) %>% 
-  select(-year)
+  select(c(capei,bm,evm,pe_op_basic,pe_exi,pe_inc,ps,pcf,dpr,npm,opmbd,opmad,gpm,ptpm,cfm,roa,roe,roce,efftax,aftret_eq,aftret_invcapx,aftret_equity,pretret_noa,pretret_earnat,gprof,equity_invcap,debt_invcap,totdebt_invcap,capital_ratio,int_debt,int_totdebt,cash_lt,rect_act,debt_at,debt_ebitda,short_debt,curr_debt,lt_debt,profit_lct,ocf_lct,cash_debt,fcf_ocf,lt_ppent,dltt_be,debt_assets,debt_capital,de_ratio,intcov,intcov_ratio,cash_ratio,quick_ratio,curr_ratio,at_turn,rect_turn,sale_invcap,sale_equity,sale_nwc,rd_sale,adv_sale,staff_sale,accrual,ptb,peg_trailing,peg_1yrforward,peg_ltgforward,alpha_next,siccd,year,date,lpermno)) %>% 
+  filter(year < 2016)
 out_sample <- data %>% 
-  select(c(capei,bm,evm,pe_op_basic,pe_exi,pe_inc,ps,pcf,dpr,npm,opmbd,opmad,gpm,ptpm,cfm,roa,roe,roce,efftax,aftret_eq,aftret_invcapx,aftret_equity,pretret_noa,pretret_earnat,gprof,equity_invcap,debt_invcap,totdebt_invcap,capital_ratio,int_debt,int_totdebt,cash_lt,rect_act,debt_at,debt_ebitda,short_debt,curr_debt,lt_debt,profit_lct,ocf_lct,cash_debt,fcf_ocf,lt_ppent,dltt_be,debt_assets,debt_capital,de_ratio,intcov,intcov_ratio,cash_ratio,quick_ratio,curr_ratio,at_turn,rect_turn,sale_invcap,sale_equity,sale_nwc,rd_sale,adv_sale,staff_sale,accrual,ptb,peg_trailing,peg_1yrforward,peg_ltgforward,alpha_next,siccd,year)) %>% 
-  filter(year >= 2016) %>% 
-  select(-year)
+  select(c(capei,bm,evm,pe_op_basic,pe_exi,pe_inc,ps,pcf,dpr,npm,opmbd,opmad,gpm,ptpm,cfm,roa,roe,roce,efftax,aftret_eq,aftret_invcapx,aftret_equity,pretret_noa,pretret_earnat,gprof,equity_invcap,debt_invcap,totdebt_invcap,capital_ratio,int_debt,int_totdebt,cash_lt,rect_act,debt_at,debt_ebitda,short_debt,curr_debt,lt_debt,profit_lct,ocf_lct,cash_debt,fcf_ocf,lt_ppent,dltt_be,debt_assets,debt_capital,de_ratio,intcov,intcov_ratio,cash_ratio,quick_ratio,curr_ratio,at_turn,rect_turn,sale_invcap,sale_equity,sale_nwc,rd_sale,adv_sale,staff_sale,accrual,ptb,peg_trailing,peg_1yrforward,peg_ltgforward,alpha_next,siccd,year,date,lpermno)) %>% 
+  filter(year >= 2016) 
 
 # We then initialize a null model, a full model and apply a stepwise selection method to isolate for each industry which accounting features could be considered for optimizing a portfolio. We loop through every industry to isolate for market effects. 
 n <- 0
 acc_gen <- 0
+interm <- data.frame()
 
 for (indus in valid_indus){
   print(indus)
   temp_out <- out_sample %>%
                    filter(siccd == indus) %>% 
-                   select(-siccd)
+                   select(-c(siccd,year,date))
   temp2 <- in_sample %>%
                    filter(siccd == indus) %>% 
-                   select(-siccd)
+                   select(-c(siccd,year,date))
   if (indus == "6211"){
     temp2 <- temp2 %>% 
       select(-int_totdebt)
@@ -687,25 +689,109 @@ for (indus in valid_indus){
                        direction = "both",
                        scope = list(upper=full_model,lower = null_model),
                        trace=0)
-  print(summary(stepwise_selec))
   new_alpha <- predict(stepwise_selec, 
-          temp_out
-          #%>% select(names(stepwise_selec$coefficients)[2:length(stepwise_selec$coefficients)])
-          )
+                       temp_out)
   temp4 <- temp_out %>% 
     cbind(new_alpha) %>% 
     mutate(acc = (new_alpha - alpha_next)) %>% 
     summarize(mean(acc))
   
+  if (nrow(interm) < 1){
+    interm <- temp_out %>% 
+      cbind(new_alpha) %>% 
+      select(alpha_next,new_alpha,lpermno) %>% 
+      mutate(industry = as.character(indus)) %>% 
+      mutate(rank = case_when(industry == "2011" ~ "1",
+                              industry == "1442" ~ "2",
+                              industry == "3511" ~ "3",
+                              industry == "2032" ~ "4",
+                              industry == "2842" ~ "5",
+                              industry == "2679" ~ "6",
+                              industry == "2439" ~ "7",
+                              industry == "2099" ~ "8",
+                              industry == "5621" ~ "9",
+                              industry == "2111" ~ "10",
+                              industry == "2911" ~ "-1",
+                              industry == "6141" ~ "-2",
+                              industry == "3571" ~ "-3",
+                              industry == "1311" ~ "-4",
+                              industry == "3550" ~ "-5",
+                              industry == "5063" ~ "-6",
+                              industry == "2066" ~ "-7",
+                              industry == "1041" ~ "-8",
+                              industry == "3721" ~ "-9",
+                              industry == "6211" ~ "-10"))
+    
+  } else {
+    interm <- interm %>% 
+    rbind(temp_out %>% 
+      cbind(new_alpha) %>% 
+      select(alpha_next,new_alpha,lpermno) %>% 
+      mutate(industry = as.character(indus)) %>% 
+      mutate(rank = case_when(industry == "2011" ~ "1",
+                              industry == "1442" ~ "2",
+                              industry == "3511" ~ "3",
+                              industry == "2032" ~ "4",
+                              industry == "2842" ~ "5",
+                              industry == "2679" ~ "6",
+                              industry == "2439" ~ "7",
+                              industry == "2099" ~ "8",
+                              industry == "5621" ~ "9",
+                              industry == "2111" ~ "10",
+                              industry == "2911" ~ "-1",
+                              industry == "6141" ~ "-2",
+                              industry == "3571" ~ "-3",
+                              industry == "1311" ~ "-4",
+                              industry == "3550" ~ "-5",
+                              industry == "5063" ~ "-6",
+                              industry == "2066" ~ "-7",
+                              industry == "1041" ~ "-8",
+                              industry == "3721" ~ "-9",
+                              industry == "6211" ~ "-10")))
+  }
+  
   if (is.na(temp4$`mean(acc)`) == FALSE) {
     n <- n + 1
     acc_gen <- acc_gen + temp4$`mean(acc)`
-    
   }
+  
 }
 
-acc_gen/n
-temp4$`mean(acc)`
+
+worst10_pred <- interm %>% 
+  mutate(err = abs(new_alpha - alpha_next)) %>% 
+  filter(as.numeric(rank) < 0) %>% 
+  arrange(new_alpha)
+  
+best10_pred <- interm %>% 
+  mutate(err = abs(new_alpha - alpha_next)) %>% 
+  filter(as.numeric(rank) > 0) %>% 
+  arrange(desc(new_alpha))
+
+write.csv(worst10_pred,
+          "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/worst10_predictions.csv",
+          row.names = FALSE)
+
+mean((interm %>% 
+  mutate(err = (new_alpha - alpha_next)) %>%
+  select(err) %>% 
+    na.omit())$err)
+
+
+stepwise_selec$anova
+
+err_hist <- interm %>% 
+  mutate(err = (new_alpha - alpha_next)) %>% 
+  ggplot() +
+  aes(x = err, fill = rank) +
+  geom_histogram() +
+  theme_bw()
+
+err_hist_ply <- ggplotly(p = err_hist, width = NULL, height = NULL,
+  tooltip = "all", dynamicTicks = FALSE, layerData = 1,
+  originalData = TRUE, source = "A")
+
+htmlwidgets::saveWidget(err_hist_ply, file = "~/Desktop/HEC Paris/Cours/DataScienceFinance/DataScienceForFinance/data/Data/image.html")
 ```
 
-Across each industry we compute the mean difference in 
+Across each industry we compute the mean difference in predicted alpha versus actual alpha to see how well our regressions perform. It would seem that on average we have a pretty good accuracy, around 0.006 difference with the actual alpha value. This selection will allow us to construct our portfolio.
